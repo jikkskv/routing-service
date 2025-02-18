@@ -1,6 +1,7 @@
 package com.coda.assignment.routing_service.controller;
 
 import com.coda.assignment.routing_service.loadbalancer.InstanceInfo;
+import com.coda.assignment.routing_service.loadbalancer.ServiceRegistry;
 import com.coda.assignment.routing_service.loadbalancer.strategies.LoadBalancer;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,10 +35,16 @@ class RoutingServiceControllerTest {
     @Mock
     private HttpServletRequest request;
 
+    @Mock
+    private ServiceRegistry serviceRegistry;
+
     @InjectMocks
     private RoutingServiceController routingServiceController;
 
     private MultiValueMap<String, String> headers;
+
+    private final String serviceName = "test-service";
+    private final String instanceIP = "http://localhost:8081";
 
     @BeforeEach
     void setUp() {
@@ -49,7 +56,6 @@ class RoutingServiceControllerTest {
     void testHandlePostRequest_SuccessfulForwarding() {
         InstanceInfo instanceInfo = new InstanceInfo("http://localhost:8081", 1000);
         when(loadBalancer.getNextInstanceInfo(anyString())).thenReturn(Optional.of(instanceInfo));
-        when(request.getServerName()).thenReturn("test-service");
         when(request.getRequestURI()).thenReturn("/test");
         when(request.getQueryString()).thenReturn("param=value");
         when(request.getMethod()).thenReturn("POST");
@@ -58,7 +64,7 @@ class RoutingServiceControllerTest {
         when(restTemplate.exchange(eq("http://localhost:8081/test?param=value"), eq(HttpMethod.POST),
                 any(HttpEntity.class), eq(Object.class))).thenReturn(mockResponse);
 
-        ResponseEntity<?> response = routingServiceController.handlePostRequest("{}", headers, request);
+        ResponseEntity<?> response = routingServiceController.handlePostRequest("{}", headers, "serviceName", request);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         verify(restTemplate, times(1)).exchange(eq("http://localhost:8081/test?param=value"),
@@ -68,11 +74,38 @@ class RoutingServiceControllerTest {
     @Test
     void testHandlePostRequest_NoAvailableInstance() {
         when(loadBalancer.getNextInstanceInfo(anyString())).thenReturn(Optional.empty());
-        when(request.getServerName()).thenReturn("test-service");
 
-        ResponseEntity<?> response = routingServiceController.handlePostRequest("{}", headers, request);
+        ResponseEntity<?> response = routingServiceController.handlePostRequest("{}", headers, "serviceName", request);
 
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE, response.getStatusCode());
         verify(restTemplate, never()).exchange(anyString(), any(HttpMethod.class), any(HttpEntity.class), eq(Object.class));
+    }
+
+    @Test
+    void testRegisterService_Success() {
+        ResponseEntity<Boolean> response = routingServiceController.register(serviceName, instanceIP);
+        verify(serviceRegistry, times(1)).register(serviceName, instanceIP);
+        assertEquals(ResponseEntity.ok(true), response);
+    }
+
+    @Test
+    void testRegisterService_Failure() {
+        doThrow(new RuntimeException("Registration Failed")).when(serviceRegistry).register(serviceName, instanceIP);
+        ResponseEntity<Boolean> response = routingServiceController.register(serviceName, instanceIP);
+        assertEquals(500, response.getStatusCode().value());
+    }
+
+    @Test
+    void testDeregisterService_Success() {
+        ResponseEntity<Boolean> response = routingServiceController.deregister(serviceName, instanceIP);
+        verify(serviceRegistry, times(1)).deRegister(serviceName, instanceIP);
+        assertEquals(ResponseEntity.ok(true), response);
+    }
+
+    @Test
+    void testDeregisterService_Failure() {
+        doThrow(new RuntimeException("DeRegistration Failed")).when(serviceRegistry).deRegister(serviceName, instanceIP);
+        ResponseEntity<Boolean> response = routingServiceController.deregister(serviceName, instanceIP);
+        assertEquals(500, response.getStatusCode().value());
     }
 }

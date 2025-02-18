@@ -11,7 +11,7 @@ public class ServiceRegistryTest {
 
     @Test
     public void testRegister_singleService() {
-        ServiceRegistry serviceRegistry = new ServiceRegistry("{}");
+        ServiceRegistry serviceRegistry = new ServiceRegistry("{}", false);
         serviceRegistry.register("service1", "instanceA");
         serviceRegistry.register("service1", "instanceB");
         serviceRegistry.register("service1", "instanceC");
@@ -24,12 +24,11 @@ public class ServiceRegistryTest {
     }
 
     @Test
-    @Disabled
     public void testRegister_testExpiry() throws InterruptedException {
-        ServiceRegistry serviceRegistry = new ServiceRegistry("{}");
+        ServiceRegistry serviceRegistry = new ServiceRegistry("{}", true);
         serviceRegistry.register("service1", "instanceA");
         serviceRegistry.register("service1", "instanceB");
-        Thread.sleep(3_000 + 1_000);
+        Thread.sleep(10_000 + 1_000);
         serviceRegistry.register("service1", "instanceC");
         serviceRegistry.register("service1", "instanceD");
 
@@ -41,7 +40,7 @@ public class ServiceRegistryTest {
 
     @Test
     public void testRegister_invalidServiceDeRegister() {
-        ServiceRegistry serviceRegistry = new ServiceRegistry("{}");
+        ServiceRegistry serviceRegistry = new ServiceRegistry("{}", false);
         serviceRegistry.register("service1", "instanceA");
         serviceRegistry.deRegister("service1", "instanceC");
 
@@ -53,7 +52,7 @@ public class ServiceRegistryTest {
 
     @Test
     public void testRegister_invalidInstanceDeRegister() {
-        ServiceRegistry serviceRegistry = new ServiceRegistry("{}");
+        ServiceRegistry serviceRegistry = new ServiceRegistry("{}", false);
         serviceRegistry.deRegister("service1", "instanceC");
 
         List<InstanceInfo> instanceInfo1 = serviceRegistry.getInstanceList("service1");
@@ -63,7 +62,7 @@ public class ServiceRegistryTest {
 
     @Test
     public void testRegister_singleServiceDeRegister() {
-        ServiceRegistry serviceRegistry = new ServiceRegistry("{}");
+        ServiceRegistry serviceRegistry = new ServiceRegistry("{}", false);
         serviceRegistry.register("service1", "instanceA");
         serviceRegistry.register("service1", "instanceB");
         serviceRegistry.register("service2", "instanceC");

@@ -15,17 +15,37 @@ import java.util.concurrent.CopyOnWriteArraySet;
 @Slf4j
 public class ServiceRegistry {
 
+    private static final long SLEEP_TIME = 10_000;
     private final ConcurrentMap<String, Set<InstanceInfo>> registry;
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
+
+
     @SuppressWarnings("unchecked")
-    public ServiceRegistry(@Value("${service.instance.address.json:{}}") String serviceInstanceAddressJson) {
+    public ServiceRegistry(@Value("${service.instance.address.json:{}}") String serviceInstanceAddressJson,
+                           @Value("${check.instance.heartbeat:false}") boolean checkForHeartBeat) {
         registry = new ConcurrentHashMap<>();
         try {
             Map<String, List<String>> serviceInstanceMap = objectMapper.readValue(serviceInstanceAddressJson, Map.class);
             serviceInstanceMap.forEach((key, value) -> value.forEach(instance -> this.register(key, instance)));
+            scheduleExpirationTask(checkForHeartBeat);
         } catch (JsonProcessingException e) {
             log.error("Parsing error occurred in parsing value of service.instance.address.json : {}", serviceInstanceAddressJson, e);
+        }
+    }
+
+    private void scheduleExpirationTask(boolean checkForHeartBeat) {
+        if (checkForHeartBeat) {
+            new Thread(() -> {
+                while (true) {
+                    try {
+                        registry.forEach((key, value) -> value.removeIf(instanceInfo -> (System.currentTimeMillis() - instanceInfo.getLastActiveTime()) > SLEEP_TIME));
+                        Thread.sleep(SLEEP_TIME);
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            }).start();
         }
     }
 
@@ -42,9 +62,5 @@ public class ServiceRegistry {
 
     public List<InstanceInfo> getInstanceList(String serviceName) {
         return registry.getOrDefault(serviceName, Collections.emptySet()).stream().toList();
-    }
-
-    public Set<String> getServiceList() {
-        return registry.keySet();
     }
 }
