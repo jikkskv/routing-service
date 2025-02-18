@@ -2,8 +2,10 @@ package com.coda.assignment.routing_service.controller;
 
 import com.coda.assignment.routing_service.loadbalancer.InstanceInfo;
 import com.coda.assignment.routing_service.loadbalancer.strategies.LoadBalancer;
+import com.coda.assignment.routing_service.service.JWTAuthorizationService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -24,6 +26,12 @@ public class RoutingServiceController {
 
     private final RestTemplate restTemplate;
 
+    @Value("${jwt.validation:false}")
+    public boolean validateJwtToken;
+
+    @Autowired
+    private JWTAuthorizationService jwtAuthorizationService;
+
     @Autowired
     RoutingServiceController(LoadBalancer loadBalancer, RestTemplate restTemplate) {
         this.loadBalancer = loadBalancer;
@@ -35,6 +43,8 @@ public class RoutingServiceController {
                                                HttpServletRequest request) {
         Optional<InstanceInfo> optionalInstanceInfo = loadBalancer.getNextInstanceInfo(request.getServerName());
         if (optionalInstanceInfo.isEmpty()) return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
+        if (validateJwtToken && jwtAuthorizationService.validateJWTToken(request))
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid JWT Token");
 
         String forwardUrl = optionalInstanceInfo.get().getInstanceIPAddress() + request.getRequestURI() + "?" + request.getQueryString();
         HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
