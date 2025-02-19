@@ -28,17 +28,20 @@ public class RoutingServiceController {
 
     private final RestTemplate restTemplate;
 
+    private final JWTAuthorizationService jwtAuthorizationService;
+
     @Value("${jwt.validation:false}")
     public boolean validateJwtToken;
 
     @Autowired
-    private JWTAuthorizationService jwtAuthorizationService;
-
-    @Autowired
-    RoutingServiceController(LoadBalancer loadBalancer, RestTemplate restTemplate, ServiceRegistry serviceRegistry) {
+    RoutingServiceController(LoadBalancer loadBalancer,
+                             RestTemplate restTemplate,
+                             ServiceRegistry serviceRegistry,
+                             JWTAuthorizationService jwtAuthorizationService) {
         this.loadBalancer = loadBalancer;
         this.restTemplate = restTemplate;
         this.serviceRegistry = serviceRegistry;
+        this.jwtAuthorizationService = jwtAuthorizationService;
     }
 
     //    @RequestMapping(value = "/**", method = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE})
@@ -48,12 +51,14 @@ public class RoutingServiceController {
                                                @PathVariable String serviceName,
                                                HttpServletRequest request) {
         Optional<InstanceInfo> optionalInstanceInfo = loadBalancer.getNextInstanceInfo(serviceName);
+        log.info("handlePostRequest, getNextInstanceInfo: {} ", optionalInstanceInfo);
         if (optionalInstanceInfo.isEmpty()) return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
         if (validateJwtToken && jwtAuthorizationService.validateJWTToken(request))
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid JWT Token");
 
         String forwardUrl = optionalInstanceInfo.get().getInstanceIPAddress() + request.getRequestURI().replace("/" + serviceName, "")  + "?" + request.getQueryString();
         HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
+        log.info("Forwarding request to  forwardUrl: {}, request.getMethod(): {} ", forwardUrl, request.getMethod());
         return restTemplate.exchange(forwardUrl, HttpMethod.valueOf(request.getMethod()), entity, Object.class);
     }
 
