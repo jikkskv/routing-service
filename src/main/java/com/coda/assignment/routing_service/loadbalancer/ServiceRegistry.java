@@ -50,13 +50,17 @@ public class ServiceRegistry {
     }
 
     public void register(String serviceName, String instanceIP) {
+        log.info("Registering started for serviceName: {}, instanceIP: {} to the load balancer: ", serviceName, instanceIP);
         registry.computeIfAbsent(serviceName, e -> new CopyOnWriteArraySet<>()).add(new InstanceInfo(instanceIP, System.currentTimeMillis()));
+        log.info("Registering completed for serviceName: {}, instanceIP: {} to the load balancer: ", serviceName, instanceIP);
     }
 
     public void deRegister(String serviceName, String instanceIP) {
         if (Objects.nonNull(registry.get(serviceName)) && !registry.get(serviceName).isEmpty()) {
+            log.info("DeRegistering started for serviceName: {}, instanceIP: {} to the load balancer: ", serviceName, instanceIP);
             Optional<InstanceInfo> optionalInstanceInfo = registry.get(serviceName).stream().filter(e -> Objects.equals(e.getInstanceIPAddress(), instanceIP)).findAny();
             optionalInstanceInfo.ifPresent(e -> registry.get(serviceName).remove(optionalInstanceInfo.get()));
+            log.info("DeRegistering completed for serviceName: {}, instanceIP: {} to the load balancer: ", serviceName, instanceIP);
         }
     }
 
